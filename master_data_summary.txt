@@ -1,0 +1,29 @@
+Total de registros consolidados (raw): 51479
+Removidos por ban_list: 4603
+Removidos por NT-*   : 459
+Total después de filtrar: 46417
+
+Columnas del DataFrame filtrado:
+ - Periodo: object
+ - Paralelo: object
+ - Identificacion_Estudiante: object
+ - Estudiante: object
+ - Carrera: object
+ - Nivel: object
+ - Asignatura: object
+ - Num_matricula: object
+ - Asistencia: object
+ - Nota_final: float64
+ - Estado_Asignatura: object
+ - Estado_Matricula: object
+ - Tipo_Ingreso: object
+ - Cedula_docente: object
+ - Nombre_docente: object
+
+Primeras 5 filas (to_string):
+Periodo Paralelo Identificacion_Estudiante                Estudiante                                        Carrera   Nivel                                               Asignatura Num_matricula Asistencia  Nota_final Estado_Asignatura Estado_Matricula Tipo_Ingreso Cedula_docente                    Nombre_docente
+2020-2P        L                0107271306 AGUAYZA RODAS KEVIN MATEO TAF-TECNOLOGIA SUPERIOR EN ASESORIA FINANCIERA PRIMERO                              TAF-116-ATENCIÓN AL CLIENTE             1      82.00         7.4          APROBADO         APROBADO       NORMAL     0105003198   VERONICA MARIBEL OCHOA CALDERON
+2020-2P        L                0107271306 AGUAYZA RODAS KEVIN MATEO TAF-TECNOLOGIA SUPERIOR EN ASESORIA FINANCIERA PRIMERO                      TAF-117-COMUNICACIÓN ORAL Y ESCRITA             1      82.00         7.3          APROBADO         APROBADO       NORMAL     0104549159        JAIME GEOVANY LOJA BUESTAN
+2020-2P        L                0107271306 AGUAYZA RODAS KEVIN MATEO TAF-TECNOLOGIA SUPERIOR EN ASESORIA FINANCIERA PRIMERO                                TAF-114-MANEJO DE CUENTAS             1     100.00         7.8          APROBADO         APROBADO       NORMAL     0103280152 NORMA ELIZABETH VELECELA ABAMBARI
+2020-2P        L                0107271306 AGUAYZA RODAS KEVIN MATEO TAF-TECNOLOGIA SUPERIOR EN ASESORIA FINANCIERA PRIMERO                                  TAF-113-MARCO ECONÓMICO             1     100.00         8.1          APROBADO         APROBADO       NORMAL     0103970851      MONICA ELIZABETH COBOS ROJAS
+2020-2P        L                0107271306 AGUAYZA RODAS KEVIN MATEO TAF-TECNOLOGIA SUPERIOR EN ASESORIA FINANCIERA PRIMERO TAF-112-MARCO JURÍDICO DEL SECTOR FINANCIERO ECUATORIANO             1     100.00         8.1          APROBADO         APROBADO       NORMAL     0103924692    MARCO PATRICIO SAMANIEGO DUMAS

@@ -1,0 +1,41 @@
+## Reporte de Rendimiento del Modelo Predictivo (Regresión Logística)
+
+**AUC-ROC Score:** 0.8603
+
+### Reporte de Clasificación:
+|              | precision   | recall   | f1-score   | support   |
+|:-------------|:------------|:---------|:-----------|:----------|
+| 0            | 0.885572    | 0.378187 | 0.530025   | 1412      |
+| 1            | 0.93179     | 0.99428  | 0.962021   | 12063     |
+| accuracy     | 0.929722    | 0.929722 | 0.929722   | 0.929722  |
+| macro avg    | 0.908681    | 0.686233 | 0.746023   | 13475     |
+| weighted avg | 0.926947    | 0.929722 | 0.916754   | 13475     |
+
+### Coeficientes del Modelo (Top 10 Positivos y Negativos):
+#### Predictores de Éxito (Coeficiente Positivo):
+| Feature                                                                   | Coefficient   |
+|:--------------------------------------------------------------------------|:--------------|
+| Carrera_DII-TECNOLOGIA EN DESARROLLO INFANTIL INTEGRAL                    | 4.33263       |
+| Carrera_TSE-TECNOLOGIA SUPERIOR EN ELECTRICIDAD                           | 4.09455       |
+| Carrera_SP-TECNICO SUPERIOR EN SEGURIDAD PENITENCIARIA                    | 3.9486        |
+| Carrera_TAF-TECNOLOGIA SUPERIOR EN ASESORIA FINANCIERA                    | 3.33434       |
+| Carrera_TSMI-TECNOLOGIA SUPERIOR EN MECANICA INDUSTRIAL                   | 1.91438       |
+| Carrera_SCOP R-TECNICO SUPERIOR EN SEGURIDAD CIUDADANA Y ORDEN PUBLICO    | 1.87068       |
+| Periodo_2024-2P                                                           | 1.0318        |
+| Carrera_TSPM-TECNOLOGIA SUPERIOR EN PROCESAMIENTO INDUSTRIAL DE LA MADERA | 0.962616      |
+| Periodo_2024-1P                                                           | 0.891783      |
+| Carrera_SP R-TECNICO SUPERIOR EN SEGURIDAD PENITENCIARIA R                | 0.694439      |
+
+#### Predictores de Fracaso (Coeficiente Negativo):
+| Feature                                                                             | Coefficient   |
+|:------------------------------------------------------------------------------------|:--------------|
+| Carrera_TSMCT-TECNOLOGIA SUPERIOR EN MECATRONICA                                    | -0.912198     |
+| Carrera_TSBD-TECNOLOGIA SUPERIOR EN BIG DATA                                        | -1.03458      |
+| Carrera_TSSP-SEGURIDAD PENITENCIARIA                                                | -1.06729      |
+| Carrera_TSTR -AC1-TRIBUTACION                                                       | -1.24788      |
+| Carrera_DESOFW-DESARROLLO DE SOFTWARE                                               | -1.50763      |
+| Carrera_TSMECI-TECNOLOGIA SUPERIOR MANTENIMIENTO ELECTRICO Y CONTROL INDUSTRIAL     | -1.66078      |
+| Carrera_TSMM-AC1-TECNOLOGIA SUPERIOR EN METALMECANICA                               | -1.81778      |
+| Tipo_Ingreso_NORMAL                                                                 | -2.33694      |
+| Carrera_TSDS-AC1-TECNOLOGIA SUPERIOR EN DESARROLLO DE SOFTWARE                      | -2.48536      |
+| Carrera_TSMECI-AC1-TECNOLOGIA SUPERIOR MANTENIMIENTO ELECTRICO Y CONTROL INDUSTRIAL | -2.51427      |
