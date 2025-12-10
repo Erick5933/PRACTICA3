@@ -1,27 +1,25 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
-import plotly.express as px
-from plotly.subplots import make_subplots
+import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from xgboost import XGBClassifier
-from sklearn.metrics import roc_auc_score, classification_report, roc_curve
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from sklearn.cluster import KMeans
 import warnings
 
 warnings.filterwarnings('ignore')
 
 # Configuración de la página
 st.set_page_config(
-    page_title="Predicción de Rendimiento Académico - IST Azuay",
+    page_title="Análisis de Rendimiento Académico - IST Azuay",
     page_icon="📚",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# Estilos personalizados
+# CSS personalizado
 st.markdown("""
     <style>
     .main-header {
@@ -31,494 +29,574 @@ st.markdown("""
         font-weight: bold;
         margin-bottom: 10px;
     }
-    .sub-header {
+    .metric-card {
+        background-color: #f0f2f6;
+        padding: 20px;
+        border-radius: 10px;
         text-align: center;
-        color: #555;
-        font-size: 1.1em;
-        margin-bottom: 30px;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Título principal
-st.markdown('<div class="main-header">📚 Predicción de Rendimiento Académico</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-header">Instituto Superior Tecnológico del Azuay</div>', unsafe_allow_html=True)
+# Título
+st.markdown('<div class="main-header">📚 Sistema de Análisis de Rendimiento Académico</div>', unsafe_allow_html=True)
+st.markdown('<p style="text-align: center; color: #666;">Instituto Superior Tecnológico del Azuay</p>', unsafe_allow_html=True)
 
-# Barra lateral de navegación
+# Navegación
 st.sidebar.title("🔍 Navegación")
 page = st.sidebar.radio(
     "Selecciona una sección:",
-    ["📊 Inicio", "📈 Análisis Exploratorio", "🤖 Comparación de Modelos", "🎯 Predictor en Tiempo Real"]
+    ["🏠 Inicio", "📊 Exploración de Datos", "🎯 Modelo Supervisado", "🔍 Modelo No Supervisado", "📈 Comparación"]
 )
 
-# Cargar datos
+# ============================================================
+# FUNCIONES DE CARGA Y PREPARACIÓN
+# ============================================================
+
 @st.cache_data
 def load_data():
-    """Cargar el dataset consolidado."""
+    """Cargar el dataset."""
     df = pd.read_csv("academic_performance_master.csv")
-    df['Exito_Academico'] = df['Estado_Asignatura'].apply(lambda x: 1 if x == 'APROBADO' else 0)
+    # Crear variable objetivo: 1=APROBADO, 0=REPROBADO
+    df['Aprobado'] = (df['Estado_Asignatura'] == 'APROBADO').astype(int)
     return df
 
 @st.cache_data
-def prepare_data(df):
-    """Preparar datos para el modelado."""
-    df_model = df.copy()
-    df_model = pd.get_dummies(df_model, columns=['Tipo_Ingreso', 'Carrera', 'Periodo'], drop_first=True)
-    model_features = [col for col in df_model.columns if col.startswith(('Asistencia', 'Num_matricula', 'Tipo_Ingreso_', 'Carrera_', 'Periodo_'))]
-    df_final = df_model[model_features + ['Exito_Academico']].dropna()
-    return df_final, model_features
+def prepare_supervised_data(df):
+    """Preparar datos para modelo supervisado."""
+    # Seleccionar solo columnas relevantes
+    features = ['Asistencia', 'Num_matricula']
+    df_clean = df[features + ['Aprobado']].dropna()
+    
+    X = df_clean[features]
+    y = df_clean['Aprobado']
+    
+    return X, y, features
 
-@st.cache_resource
-def train_models(X_train, y_train):
-    """Entrenar los modelos."""
-    models = {
-        "Logistic Regression": LogisticRegression(max_iter=1000, solver='liblinear', random_state=42),
-        "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1),
-        "XGBoost": XGBClassifier(eval_metric='logloss', random_state=42, n_jobs=-1, verbose=0)
-    }
-    
-    trained_models = {}
-    for name, model in models.items():
-        model.fit(X_train, y_train)
-        trained_models[name] = model
-    
-    return trained_models
+@st.cache_data
+def prepare_clustering_data(df):
+    """Preparar datos para clustering."""
+    df_cluster = df[['Asistencia', 'Nota_final']].dropna()
+    return df_cluster
 
 # Cargar datos
 df = load_data()
-df_final, model_features = prepare_data(df)
 
-# División de datos
-X = df_final[model_features]
-y = df_final['Exito_Academico']
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42, stratify=y)
+# ============================================================
+# PÁGINA: INICIO
+# ============================================================
 
-# Entrenar modelos
-trained_models = train_models(X_train, y_train)
-
-# Página: Inicio
-if page == "📊 Inicio":
-    st.header("Bienvenido al Sistema de Predicción de Rendimiento Académico")
+if page == "🏠 Inicio":
+    st.header("Bienvenido al Sistema de Análisis Académico")
     
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.metric("Total de Registros", len(df), "Periodos Académicos: 7")
+        st.metric("📊 Total de Registros", f"{len(df):,}")
     
     with col2:
-        tasa_exito = (df['Exito_Academico'].sum() / len(df)) * 100
-        st.metric("Tasa de Éxito Promedio", f"{tasa_exito:.1f}%", "Estudiantes Aprobados")
+        tasa_aprobacion = (df['Aprobado'].sum() / len(df)) * 100
+        st.metric("✅ Tasa de Aprobación", f"{tasa_aprobacion:.1f}%")
     
     with col3:
-        num_carreras = df['Carrera'].nunique()
-        st.metric("Carreras Registradas", num_carreras, "Programas Académicos")
+        st.metric("🎓 Carreras", df['Carrera'].nunique())
     
     st.markdown("---")
     
-    st.subheader("📋 Descripción del Proyecto")
+    st.subheader("📋 Objetivo del Proyecto")
     st.write("""
-    Este sistema utiliza **modelos de aprendizaje automático** para predecir el rendimiento académico 
-    de los estudiantes del Instituto Superior Tecnológico del Azuay. El objetivo es identificar 
-    tempranamente a los estudiantes en riesgo de no aprobar sus asignaturas, permitiendo implementar 
-    estrategias de intervención y apoyo académico.
+    Este sistema implementa **dos modelos de Machine Learning** para analizar el rendimiento académico:
     
-    **Características principales:**
-    - 📊 Análisis exploratorio de datos con visualizaciones interactivas (Plotly)
-    - 🤖 Comparación de tres modelos predictivos (Regresión Logística, Random Forest, XGBoost)
-    - 🎯 Predictor en tiempo real para estudiantes individuales
-    - 📈 Métricas de rendimiento detalladas
-    """)
+    1. **Modelo Supervisado (Clasificación)**: Predice si un estudiante aprobará o reprobará
+    2. **Modelo No Supervisado (Clustering)**: Agrupa estudiantes con patrones similares
+    
+    **Dataset**: `academic_performance_master.csv`  
+    **Registros**: {:,} estudiantes  
+    **Variables clave**: Asistencia, Nota Final, Carrera, Periodo
+    """.format(len(df)))
     
     st.markdown("---")
     
-    st.subheader("🚀 Cómo Usar Esta Aplicación")
-    st.write("""
-    1. **📈 Análisis Exploratorio:** Explora los datos históricos y visualiza tendencias.
-    2. **🤖 Comparación de Modelos:** Compara el rendimiento de diferentes algoritmos.
-    3. **🎯 Predictor:** Realiza predicciones para estudiantes individuales.
-    """)
-
-# Página: Análisis Exploratorio
-elif page == "📈 Análisis Exploratorio":
-    st.header("📈 Análisis Exploratorio de Datos (EDA)")
-    
-    # Tabs para diferentes análisis
-    tab1, tab2, tab3, tab4 = st.tabs(["Distribución de Notas", "Éxito por Periodo", "Éxito por Carrera", "Asistencia vs Nota"])
-    
-    with tab1:
-        st.subheader("Distribución de la Nota Final")
-        
-        fig = go.Figure()
-        fig.add_trace(go.Histogram(
-            x=df['Nota_final'],
-            nbinsx=20,
-            name='Notas',
-            marker=dict(color='#1f77b4', line=dict(color='#0d47a1', width=1))
-        ))
-        
-        fig.update_layout(
-            title='Distribución de la Nota Final',
-            xaxis_title='Nota Final',
-            yaxis_title='Frecuencia',
-            hovermode='x unified',
-            template='plotly_white',
-            height=500
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Nota Promedio", f"{df['Nota_final'].mean():.2f}")
-        with col2:
-            st.metric("Nota Mínima", f"{df['Nota_final'].min():.2f}")
-        with col3:
-            st.metric("Nota Máxima", f"{df['Nota_final'].max():.2f}")
-    
-    with tab2:
-        st.subheader("Tasa de Éxito Académico por Periodo")
-        period_success = df.groupby('Periodo')['Exito_Academico'].agg(['mean', 'count']).reset_index()
-        period_success.columns = ['Periodo', 'Tasa_Exito', 'Total_Registros']
-        
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=period_success['Periodo'],
-            y=period_success['Tasa_Exito'],
-            marker=dict(color=period_success['Tasa_Exito'], colorscale='Viridis', showscale=True),
-            text=period_success['Tasa_Exito'].apply(lambda x: f'{x*100:.1f}%'),
-            textposition='outside',
-            hovertemplate='<b>%{x}</b><br>Tasa de Éxito: %{y:.2%}<extra></extra>'
-        ))
-        
-        fig.update_layout(
-            title='Tasa de Éxito Académico por Periodo',
-            xaxis_title='Periodo Académico',
-            yaxis_title='Tasa de Éxito',
-            hovermode='x unified',
-            template='plotly_white',
-            height=500
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        st.dataframe(period_success, use_container_width=True, hide_index=True)
-    
-    with tab3:
-        st.subheader("Tasa de Éxito por Carrera (Top 10)")
-        career_success = df.groupby('Carrera')['Exito_Academico'].agg(['mean', 'count']).reset_index()
-        career_success = career_success[career_success['count'] > 100].sort_values(by='mean', ascending=False).head(10)
-        career_success.columns = ['Carrera', 'Tasa_Exito', 'Total_Registros']
-        
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            y=career_success['Carrera'],
-            x=career_success['Tasa_Exito'],
-            orientation='h',
-            marker=dict(color=career_success['Tasa_Exito'], colorscale='Plasma', showscale=True),
-            text=career_success['Tasa_Exito'].apply(lambda x: f'{x*100:.1f}%'),
-            textposition='outside',
-            hovertemplate='<b>%{y}</b><br>Tasa de Éxito: %{x:.2%}<extra></extra>'
-        ))
-        
-        fig.update_layout(
-            title='Top 10 Carreras por Tasa de Éxito',
-            xaxis_title='Tasa de Éxito',
-            yaxis_title='Carrera',
-            hovermode='y unified',
-            template='plotly_white',
-            height=600
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        st.dataframe(career_success, use_container_width=True, hide_index=True)
-    
-    with tab4:
-        st.subheader("Relación entre Asistencia y Nota Final")
-        sample_df = df.sample(n=min(5000, len(df)), random_state=42)
-        
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=sample_df['Asistencia'],
-            y=sample_df['Nota_final'],
-            mode='markers',
-            marker=dict(
-                size=5,
-                color=sample_df['Nota_final'],
-                colorscale='Viridis',
-                showscale=True,
-                colorbar=dict(title="Nota Final")
-            ),
-            text=sample_df['Estudiante'],
-            hovertemplate='<b>Asistencia:</b> %{x}%<br><b>Nota Final:</b> %{y:.2f}<extra></extra>'
-        ))
-        
-        fig.update_layout(
-            title='Relación entre Asistencia y Nota Final (Muestra)',
-            xaxis_title='Asistencia (%)',
-            yaxis_title='Nota Final',
-            hovermode='closest',
-            template='plotly_white',
-            height=500
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Correlación
-        corr = df['Asistencia'].corr(df['Nota_final'])
-        st.info(f"**Correlación de Pearson:** {corr:.4f} (Relación positiva fuerte)")
-
-# Página: Comparación de Modelos
-elif page == "🤖 Comparación de Modelos":
-    st.header("🤖 Comparación de Modelos Predictivos")
-    
-    # Evaluar modelos
-    results = {}
-    for name, model in trained_models.items():
-        y_proba = model.predict_proba(X_test)[:, 1]
-        y_pred = model.predict(X_test)
-        auc_score = roc_auc_score(y_test, y_proba)
-        report = classification_report(y_test, y_pred, output_dict=True)
-        results[name] = {
-            "AUC": auc_score,
-            "Accuracy": report['accuracy'],
-            "Precision": report['1']['precision'],
-            "Recall": report['1']['recall'],
-            "F1": report['1']['f1-score'],
-            "y_proba": y_proba
-        }
-    
-    # Tabla de comparación
-    st.subheader("📊 Tabla de Comparación de Modelos")
-    comparison_df = pd.DataFrame({
-        "Modelo": list(results.keys()),
-        "AUC-ROC": [results[m]["AUC"] for m in results.keys()],
-        "Accuracy": [results[m]["Accuracy"] for m in results.keys()],
-        "Precisión": [results[m]["Precision"] for m in results.keys()],
-        "Recall": [results[m]["Recall"] for m in results.keys()],
-        "F1-Score": [results[m]["F1"] for m in results.keys()]
-    })
-    
-    
-    numeric_cols = comparison_df.select_dtypes(include=['float', 'int']).columns
-
-    st.dataframe(
-        comparison_df.style.format(
-            {col: "{:.4f}" for col in numeric_cols}
-        ),
-        use_container_width=True,
-        hide_index=True
-    )
-
-    # Gráfico de comparación de AUC (Plotly)
-    st.subheader("📈 Comparación de AUC-ROC")
-    models_list = list(results.keys())
-    auc_scores = [results[m]["AUC"] for m in models_list]
-    
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=models_list,
-        y=auc_scores,
-        marker=dict(
-            color=['#1f77b4', '#ff7f0e', '#2ca02c'],
-            line=dict(color='#000', width=2)
-        ),
-        text=[f'{score:.4f}' for score in auc_scores],
-        textposition='outside',
-        hovertemplate='<b>%{x}</b><br>AUC-ROC: %{y:.4f}<extra></extra>'
-    ))
-    
-    fig.update_layout(
-        title='Comparación de AUC-ROC entre Modelos',
-        yaxis_title='AUC-ROC Score',
-        yaxis=dict(range=[0.8, 1.0]),
-        hovermode='x unified',
-        template='plotly_white',
-        height=500
-    )
-    
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # Curvas ROC (Plotly)
-    st.subheader("📉 Curvas ROC")
-    fig = go.Figure()
-    
-    for name, model in trained_models.items():
-        y_proba = results[name]["y_proba"]
-        fpr, tpr, _ = roc_curve(y_test, y_proba)
-        auc = results[name]["AUC"]
-        
-        fig.add_trace(go.Scatter(
-            x=fpr,
-            y=tpr,
-            mode='lines',
-            name=f'{name} (AUC = {auc:.4f})',
-            hovertemplate='<b>FPR:</b> %{x:.4f}<br><b>TPR:</b> %{y:.4f}<extra></extra>'
-        ))
-    
-    # Línea de clasificador aleatorio
-    fig.add_trace(go.Scatter(
-        x=[0, 1],
-        y=[0, 1],
-        mode='lines',
-        name='Clasificador Aleatorio',
-        line=dict(dash='dash', color='black'),
-        hovertemplate='<b>FPR:</b> %{x:.4f}<br><b>TPR:</b> %{y:.4f}<extra></extra>'
-    ))
-    
-    fig.update_layout(
-        title='Curvas ROC - Comparación de Modelos',
-        xaxis_title='Tasa de Falsos Positivos (FPR)',
-        yaxis_title='Tasa de Verdaderos Positivos (TPR)',
-        hovermode='closest',
-        template='plotly_white',
-        height=600
-    )
-    
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # Tabla de métricas por clase
-    st.subheader("📋 Métricas Detalladas por Clase (Clase 0 = No Aprobado, Clase 1 = Aprobado)")
-    
-    for name in results.keys():
-        with st.expander(f"📌 {name}"):
-            y_pred = trained_models[name].predict(X_test)
-            report = classification_report(y_test, y_pred, output_dict=True)
-            
-            metrics_df = pd.DataFrame({
-                'Métrica': ['Precisión', 'Recall', 'F1-Score', 'Soporte'],
-                'Clase 0 (No Aprobado)': [
-                    f"{report['0']['precision']:.4f}",
-                    f"{report['0']['recall']:.4f}",
-                    f"{report['0']['f1-score']:.4f}",
-                    f"{int(report['0']['support'])}"
-                ],
-                'Clase 1 (Aprobado)': [
-                    f"{report['1']['precision']:.4f}",
-                    f"{report['1']['recall']:.4f}",
-                    f"{report['1']['f1-score']:.4f}",
-                    f"{int(report['1']['support'])}"
-                ]
-            })
-            
-            st.dataframe(metrics_df, use_container_width=True, hide_index=True)
-    
-    # Selección del mejor modelo
-    st.markdown("---")
-    best_model_name = max(results, key=lambda x: results[x]["AUC"])
-    st.success(f"✅ **Mejor Modelo Seleccionado:** {best_model_name} (AUC: {results[best_model_name]['AUC']:.4f})")
-
-# Página: Predictor en Tiempo Real
-elif page == "🎯 Predictor en Tiempo Real":
-    st.header("🎯 Predictor de Rendimiento Académico")
-    
-    st.write("Ingresa los datos del estudiante para realizar una predicción de éxito académico.")
-    
-    # Usar el mejor modelo (XGBoost)
-    best_model = trained_models["XGBoost"]
-    
-    # Inputs del usuario
+    st.subheader("🎯 ¿Cómo usar esta aplicación?")
     col1, col2 = st.columns(2)
     
     with col1:
-        asistencia = st.slider("Asistencia (%)", 0, 100, 80)
-        num_matricula = st.number_input("Número de Matrícula", 0, 10, 1)
+        st.info("""
+        **📊 Exploración de Datos**
+        - Visualiza distribuciones
+        - Identifica patrones
+        - Estadísticas descriptivas
+        """)
+        
+        st.success("""
+        **🎯 Modelo Supervisado**
+        - Regresión Logística
+        - Predicción de aprobación
+        - Matriz de confusión
+        """)
     
     with col2:
-        tipo_ingreso = st.selectbox("Tipo de Ingreso", df['Tipo_Ingreso'].unique())
-        carrera = st.selectbox("Carrera", df['Carrera'].unique())
+        st.warning("""
+        **🔍 Modelo No Supervisado**
+        - K-Means Clustering
+        - Agrupación de estudiantes
+        - Perfiles académicos
+        """)
+        
+        st.error("""
+        **📈 Comparación**
+        - Análisis de ambos modelos
+        - Conclusiones
+        - Recomendaciones
+        """)
+
+# ============================================================
+# PÁGINA: EXPLORACIÓN DE DATOS
+# ============================================================
+
+elif page == "📊 Exploración de Datos":
+    st.header("📊 Exploración de Datos")
     
-    periodo = st.selectbox("Periodo Académico", df['Periodo'].unique())
+    tab1, tab2, tab3 = st.tabs(["Vista General", "Distribuciones", "Correlaciones"])
     
-    # Preparar datos para predicción
-    if st.button("🔮 Realizar Predicción", use_container_width=True):
-        # Crear un DataFrame con los datos del estudiante
-        input_data = pd.DataFrame({
-            'Asistencia': [asistencia],
-            'Num_matricula': [num_matricula],
-            'Tipo_Ingreso': [tipo_ingreso],
-            'Carrera': [carrera],
-            'Periodo': [periodo]
-        })
+    with tab1:
+        st.subheader("Vista Previa del Dataset")
+        st.dataframe(df.head(10), use_container_width=True)
         
-        # Codificar variables categóricas
-        input_data = pd.get_dummies(input_data, columns=['Tipo_Ingreso', 'Carrera', 'Periodo'], drop_first=True)
-        
-        # Alinear con las características del modelo
-        for col in model_features:
-            if col not in input_data.columns:
-                input_data[col] = 0
-        
-        input_data = input_data[model_features]
-        
-        # Realizar predicción
-        prediction_proba = best_model.predict_proba(input_data)[0]
-        prediction = best_model.predict(input_data)[0]
-        
-        # Mostrar resultados
-        st.markdown("---")
-        st.subheader("📊 Resultado de la Predicción")
-        
-        col1, col2, col3 = st.columns(3)
+        st.subheader("Información del Dataset")
+        col1, col2 = st.columns(2)
         
         with col1:
-            if prediction == 1:
-                st.success("✅ **Predicción: APROBADO**")
-            else:
-                st.error("❌ **Predicción: NO APROBADO**")
+            st.write("**Dimensiones:**")
+            st.write(f"- Filas: {len(df):,}")
+            st.write(f"- Columnas: {len(df.columns)}")
+            st.write(f"- Valores nulos: {df.isnull().sum().sum()}")
         
         with col2:
-            st.metric("Probabilidad de Aprobación", f"{prediction_proba[1]*100:.1f}%")
+            st.write("**Tipos de Datos:**")
+            st.dataframe(df.dtypes.reset_index().rename(columns={0: 'Tipo', 'index': 'Columna'}))
         
-        with col3:
-            st.metric("Probabilidad de No Aprobación", f"{prediction_proba[0]*100:.1f}%")
+        st.subheader("Estadísticas Descriptivas")
+        st.dataframe(df.describe(), use_container_width=True)
+    
+    with tab2:
+        st.subheader("Distribución de Variables Clave")
         
-        # Gráfico de probabilidades (Plotly)
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=['No Aprobado', 'Aprobado'],
-            y=prediction_proba,
-            marker=dict(color=['#d62728', '#2ca02c']),
-            text=[f'{prob*100:.1f}%' for prob in prediction_proba],
-            textposition='outside',
-            hovertemplate='<b>%{x}</b><br>Probabilidad: %{y:.2%}<extra></extra>'
-        ))
+        col1, col2 = st.columns(2)
         
-        fig.update_layout(
-            title='Distribución de Probabilidades',
-            yaxis_title='Probabilidad',
-            yaxis=dict(range=[0, 1]),
-            hovermode='x unified',
-            template='plotly_white',
-            height=500
-        )
+        with col1:
+            # Distribución de Nota Final
+            fig, ax = plt.subplots(figsize=(8, 5))
+            ax.hist(df['Nota_final'].dropna(), bins=20, color='skyblue', edgecolor='black')
+            ax.axvline(7, color='red', linestyle='--', linewidth=2, label='Nota Mínima (7.0)')
+            ax.set_title('Distribución de Nota Final', fontsize=14, fontweight='bold')
+            ax.set_xlabel('Nota Final')
+            ax.set_ylabel('Frecuencia')
+            ax.legend()
+            ax.grid(True, alpha=0.3)
+            st.pyplot(fig)
+            plt.close()
+            
+            # Métricas de Nota Final
+            st.metric("Media", f"{df['Nota_final'].mean():.2f}")
+            st.metric("Desviación Estándar", f"{df['Nota_final'].std():.2f}")
         
-        st.plotly_chart(fig, use_container_width=True)
+        with col2:
+            # Distribución de Asistencia
+            fig, ax = plt.subplots(figsize=(8, 5))
+            ax.hist(df['Asistencia'].dropna(), bins=20, color='lightgreen', edgecolor='black')
+            ax.set_title('Distribución de Asistencia', fontsize=14, fontweight='bold')
+            ax.set_xlabel('Asistencia (%)')
+            ax.set_ylabel('Frecuencia')
+            ax.grid(True, alpha=0.3)
+            st.pyplot(fig)
+            plt.close()
+            
+            # Métricas de Asistencia
+            st.metric("Media", f"{df['Asistencia'].mean():.1f}%")
+            st.metric("Desviación Estándar", f"{df['Asistencia'].std():.1f}%")
         
-        # Recomendaciones
-        st.markdown("---")
-        st.subheader("💡 Recomendaciones")
+        # Distribución Aprobados/Reprobados
+        st.subheader("Distribución de Aprobados vs Reprobados")
+        fig, ax = plt.subplots(figsize=(10, 5))
+        counts = df['Aprobado'].value_counts()
+        colors = ['salmon', 'lightblue']
+        ax.bar(['Reprobados', 'Aprobados'], counts.values, color=colors, edgecolor='black', width=0.6)
+        ax.set_ylabel('Cantidad de Estudiantes')
+        ax.set_title('Distribución de Estudiantes Aprobados/Reprobados', fontsize=14, fontweight='bold')
+        for i, v in enumerate(counts.values):
+            ax.text(i, v + 100, str(v), ha='center', fontweight='bold')
+        ax.grid(True, alpha=0.3, axis='y')
+        st.pyplot(fig)
+        plt.close()
+    
+    with tab3:
+        st.subheader("Relación entre Variables")
         
-        if prediction == 1:
-            st.info("""
-            ✅ El estudiante tiene una alta probabilidad de aprobar la asignatura.
-            - Mantener el nivel de asistencia actual.
-            - Continuar con las estrategias de estudio que han sido efectivas.
-            """)
-        else:
-            st.warning("""
-            ⚠️ El estudiante está en riesgo de no aprobar la asignatura.
-            - **Aumentar la asistencia:** La asistencia es el predictor más importante.
-            - **Solicitar tutorías:** Buscar apoyo académico adicional.
-            - **Revisar métodos de estudio:** Considerar cambios en las estrategias de aprendizaje.
-            - **Comunicarse con el docente:** Informar sobre dificultades y buscar orientación.
-            """)
+        # Scatter plot: Asistencia vs Nota Final
+        fig, ax = plt.subplots(figsize=(10, 6))
+        sample = df.sample(n=min(3000, len(df)), random_state=42)
+        scatter = ax.scatter(sample['Asistencia'], sample['Nota_final'], 
+                           c=sample['Aprobado'], cmap='RdYlGn', 
+                           alpha=0.5, edgecolors='black', s=30)
+        ax.set_xlabel('Asistencia (%)', fontsize=12)
+        ax.set_ylabel('Nota Final', fontsize=12)
+        ax.set_title('Asistencia vs Nota Final (Muestra)', fontsize=14, fontweight='bold')
+        ax.grid(True, alpha=0.3)
+        plt.colorbar(scatter, ax=ax, label='Aprobado (1=Sí, 0=No)')
+        st.pyplot(fig)
+        plt.close()
+        
+        # Correlación
+        corr = df[['Asistencia', 'Nota_final', 'Aprobado']].corr()
+        st.subheader("Matriz de Correlación")
+        fig, ax = plt.subplots(figsize=(8, 6))
+        sns.heatmap(corr, annot=True, fmt='.3f', cmap='coolwarm', 
+                   center=0, square=True, linewidths=1, ax=ax)
+        ax.set_title('Correlación entre Variables', fontsize=14, fontweight='bold')
+        st.pyplot(fig)
+        plt.close()
 
-# Footer
-st.markdown("---")
-st.markdown("""
-    <div style='text-align: center; color: #888; font-size: 0.9em;'>
-    <p>Sistema de Predicción de Rendimiento Académico - Instituto Superior Tecnológico del Azuay</p>
-    <p>Desarrollado con Python, Scikit-learn, XGBoost, Streamlit y Plotly</p>
-    </div>
-""", unsafe_allow_html=True)
+# ============================================================
+# PÁGINA: MODELO SUPERVISADO
+# ============================================================
+
+elif page == "🎯 Modelo Supervisado":
+    st.header("🎯 Modelo Supervisado - Clasificación")
+    st.markdown("**Predicción de Aprobación usando Regresión Logística**")
+    
+    # Preparar datos
+    X, y, features = prepare_supervised_data(df)
+    
+    st.sidebar.subheader("⚙️ Configuración del Modelo")
+    test_size = st.sidebar.slider("Tamaño del conjunto de prueba", 0.1, 0.5, 0.3, 0.05)
+    random_state = st.sidebar.number_input("Semilla aleatoria", 1, 100, 42)
+    
+    # Dividir datos
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=test_size, random_state=random_state, stratify=y
+    )
+    
+    # Escalar datos
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+    
+    # Mostrar información de los datos
+    st.subheader("📊 Información del Dataset")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Total de datos", len(X))
+    col2.metric("Entrenamiento", len(X_train))
+    col3.metric("Prueba", len(X_test))
+    col4.metric("Features", len(features))
+    
+    st.write(f"**Features seleccionados:** {', '.join(features)}")
+    
+    # Entrenar modelo
+    if st.button("🚀 Entrenar Modelo de Regresión Logística", type="primary", use_container_width=True):
+        with st.spinner("Entrenando modelo..."):
+            # Entrenar
+            model = LogisticRegression(random_state=random_state, max_iter=1000)
+            model.fit(X_train_scaled, y_train)
+            
+            # Predicciones
+            y_pred_train = model.predict(X_train_scaled)
+            y_pred_test = model.predict(X_test_scaled)
+            
+            # Métricas
+            train_accuracy = accuracy_score(y_train, y_pred_train)
+            test_accuracy = accuracy_score(y_test, y_pred_test)
+            
+            st.success("✅ Modelo entrenado exitosamente!")
+            
+            # Mostrar resultados
+            st.subheader("📈 Resultados del Modelo")
+            
+            col1, col2, col3 = st.columns(3)
+            col1.metric("🎯 Accuracy (Entrenamiento)", f"{train_accuracy:.2%}")
+            col2.metric("🎯 Accuracy (Prueba)", f"{test_accuracy:.2%}")
+            col3.metric("📊 Diferencia", f"{abs(train_accuracy - test_accuracy):.2%}")
+            
+            # Matriz de Confusión
+            st.subheader("🔲 Matriz de Confusión")
+            cm = confusion_matrix(y_test, y_pred_test)
+            
+            fig, ax = plt.subplots(figsize=(8, 6))
+            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+                       xticklabels=['Reprobado', 'Aprobado'],
+                       yticklabels=['Reprobado', 'Aprobado'],
+                       cbar_kws={'label': 'Cantidad'},
+                       linewidths=2, linecolor='black', ax=ax)
+            ax.set_ylabel('Valor Real', fontsize=12, fontweight='bold')
+            ax.set_xlabel('Predicción', fontsize=12, fontweight='bold')
+            ax.set_title('Matriz de Confusión - Modelo Supervisado', fontsize=14, fontweight='bold')
+            st.pyplot(fig)
+            plt.close()
+            
+            # Interpretación de la matriz
+            tn, fp, fn, tp = cm.ravel()
+            st.write(f"""
+            **Interpretación de la Matriz de Confusión:**
+            - ✅ **Verdaderos Negativos (TN)**: {tn} - Correctamente predijo reprobados
+            - ❌ **Falsos Positivos (FP)**: {fp} - Predijo aprobado pero era reprobado
+            - ❌ **Falsos Negativos (FN)**: {fn} - Predijo reprobado pero era aprobado
+            - ✅ **Verdaderos Positivos (TP)**: {tp} - Correctamente predijo aprobados
+            """)
+            
+            # Reporte de Clasificación
+            st.subheader("📋 Reporte de Clasificación Detallado")
+            report = classification_report(y_test, y_pred_test, 
+                                          target_names=['Reprobado', 'Aprobado'],
+                                          output_dict=True)
+            report_df = pd.DataFrame(report).transpose()
+            st.dataframe(report_df.style.format("{:.4f}"), use_container_width=True)
+            
+            # Importancia de features
+            if hasattr(model, 'coef_'):
+                st.subheader("📊 Importancia de Variables")
+                
+                feature_importance = pd.DataFrame({
+                    'Feature': features,
+                    'Coeficiente': model.coef_[0],
+                    'Importancia': np.abs(model.coef_[0])
+                }).sort_values('Importancia', ascending=False)
+                
+                fig, ax = plt.subplots(figsize=(10, 5))
+                colors = ['green' if x > 0 else 'red' for x in feature_importance['Coeficiente']]
+                ax.barh(feature_importance['Feature'], feature_importance['Importancia'], 
+                       color=colors, edgecolor='black')
+                ax.set_xlabel('Importancia Absoluta', fontsize=12)
+                ax.set_title('Importancia de Variables en la Predicción', fontsize=14, fontweight='bold')
+                ax.grid(True, alpha=0.3, axis='x')
+                st.pyplot(fig)
+                plt.close()
+                
+                st.dataframe(feature_importance, use_container_width=True, hide_index=True)
+            
+            # Interpretación final
+            st.markdown("---")
+            st.subheader("💡 Interpretación de Resultados")
+            
+            if test_accuracy >= 0.85:
+                st.success(f"""
+                ✅ **Excelente rendimiento del modelo ({test_accuracy:.2%})**
+                - El modelo es muy confiable para predecir aprobación/reprobación
+                - Alta precisión en ambas clases
+                """)
+            elif test_accuracy >= 0.75:
+                st.info(f"""
+                👍 **Buen rendimiento del modelo ({test_accuracy:.2%})**
+                - El modelo es útil para predicciones
+                - Se puede mejorar con más features
+                """)
+            else:
+                st.warning(f"""
+                ⚠️ **Rendimiento moderado del modelo ({test_accuracy:.2%})**
+                - Considerar agregar más variables predictoras
+                - Evaluar otros algoritmos
+                """)
+            
+            st.write("""
+            **Conclusiones del Modelo Supervisado:**
+            - Tipo: **Aprendizaje Supervisado (Clasificación)**
+            - Algoritmo: **Regresión Logística**
+            - Objetivo: Predecir si un estudiante aprobará o reprobará
+            - Variables más influyentes: {}
+            """.format(', '.join(feature_importance.head(2)['Feature'].tolist())))
+
+# ============================================================
+# PÁGINA: MODELO NO SUPERVISADO
+# ============================================================
+
+elif page == "🔍 Modelo No Supervisado":
+    st.header("🔍 Modelo No Supervisado - Clustering")
+    st.markdown("**Agrupación de estudiantes usando K-Means**")
+    
+    # Preparar datos
+    df_cluster = prepare_clustering_data(df)
+    
+    st.sidebar.subheader("⚙️ Configuración de K-Means")
+    n_clusters = st.sidebar.slider("Número de clusters (k)", 2, 5, 3)
+    random_state = st.sidebar.number_input("Semilla aleatoria", 1, 100, 42)
+    
+    st.subheader("📊 Información del Dataset para Clustering")
+    col1, col2 = st.columns(2)
+    col1.metric("Registros válidos", len(df_cluster))
+    col2.metric("Features", "Asistencia, Nota_final")
+    
+    # Mostrar muestra de datos
+    st.write("**Muestra de datos para clustering:**")
+    st.dataframe(df_cluster.head(10), use_container_width=True)
+    
+    if st.button("🔍 Aplicar K-Means Clustering", type="primary", use_container_width=True):
+        with st.spinner("Aplicando clustering..."):
+            # Escalar datos
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(df_cluster)
+            
+            # Aplicar K-Means
+            kmeans = KMeans(n_clusters=n_clusters, random_state=random_state, n_init=10)
+            clusters = kmeans.fit_predict(X_scaled)
+            
+            # Agregar clusters al dataframe
+            df_cluster['Cluster'] = clusters
+            
+            st.success(f"✅ Clustering completado con {n_clusters} grupos!")
+            
+            # Visualización principal
+            st.subheader("📊 Visualización de Clusters")
+            
+            fig, ax = plt.subplots(figsize=(12, 8))
+            
+            # Graficar cada cluster con diferente color
+            colors = plt.cm.viridis(np.linspace(0, 1, n_clusters))
+            for i in range(n_clusters):
+                cluster_data = df_cluster[df_cluster['Cluster'] == i]
+                ax.scatter(cluster_data['Asistencia'], cluster_data['Nota_final'],
+                          c=[colors[i]], label=f'Cluster {i}', 
+                          alpha=0.6, s=100, edgecolors='black', linewidth=0.5)
+            
+            # Graficar centroides
+            centroids = scaler.inverse_transform(kmeans.cluster_centers_)
+            ax.scatter(centroids[:, 0], centroids[:, 1],
+                      c='red', s=500, alpha=0.9, marker='X',
+                      edgecolors='black', linewidths=3, label='Centroides')
+            
+            ax.set_xlabel('Asistencia (%)', fontsize=14, fontweight='bold')
+            ax.set_ylabel('Nota Final', fontsize=14, fontweight='bold')
+            ax.set_title(f'K-Means Clustering (k={n_clusters})', fontsize=16, fontweight='bold')
+            ax.legend(fontsize=12, loc='best')
+            ax.grid(True, alpha=0.3)
+            
+            st.pyplot(fig)
+            plt.close()
+            
+            # Estadísticas por cluster
+            st.subheader("📊 Estadísticas por Cluster")
+            
+            cluster_stats = df_cluster.groupby('Cluster').agg({
+                'Asistencia': ['mean', 'std', 'min', 'max', 'count'],
+                'Nota_final': ['mean', 'std', 'min', 'max']
+            }).round(2)
+            
+            cluster_stats.columns = ['_'.join(col).strip() for col in cluster_stats.columns.values]
+            cluster_stats = cluster_stats.reset_index()
+            
+            st.dataframe(cluster_stats, use_container_width=True)
+            
+            # Distribución de clusters
+            st.subheader("📈 Distribución de Estudiantes por Cluster")
+            
+            fig, ax = plt.subplots(figsize=(10, 5))
+            cluster_counts = df_cluster['Cluster'].value_counts().sort_index()
+            bars = ax.bar(cluster_counts.index, cluster_counts.values, 
+                         color=colors[:n_clusters], edgecolor='black', width=0.6)
+            
+            for bar in bars:
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width()/2., height,
+                       f'{int(height)}\n({height/len(df_cluster)*100:.1f}%)',
+                       ha='center', va='bottom', fontweight='bold')
+            
+            ax.set_xlabel('Cluster', fontsize=12, fontweight='bold')
+            ax.set_ylabel('Cantidad de Estudiantes', fontsize=12, fontweight='bold')
+            ax.set_title('Distribución de Estudiantes por Cluster', fontsize=14, fontweight='bold')
+            ax.grid(True, alpha=0.3, axis='y')
+            st.pyplot(fig)
+            plt.close()
+            
+            # Interpretación de clusters
+            st.markdown("---")
+            st.subheader("💡 Interpretación de Clusters")
+            
+            for i in range(n_clusters):
+                cluster_data = df_cluster[df_cluster['Cluster'] == i]
+                avg_asistencia = cluster_data['Asistencia'].mean()
+                avg_nota = cluster_data['Nota_final'].mean()
+                count = len(cluster_data)
+                
+                # Determinar perfil
+                if avg_nota >= 8 and avg_asistencia >= 85:
+                    perfil = "🌟 **Estudiantes Exitosos**"
+                    descripcion = "Alta asistencia y excelentes notas. Son estudiantes modelo."
+                    color = "success"
+                elif avg_nota < 7 and avg_asistencia < 70:
+                    perfil = "⚠️ **Estudiantes en Riesgo**"
+                    descripcion = "Baja asistencia y notas bajas. **Requieren intervención urgente.**"
+                    color = "error"
+                elif avg_asistencia >= 80 and avg_nota < 7.5:
+                    perfil = "🤔 **Necesitan Apoyo Académico**"
+                    descripcion = "Buena asistencia pero dificultades académicas. Necesitan tutorías."
+                    color = "warning"
+                else:
+                    perfil = "📈 **Rendimiento Medio**"
+                    descripcion = "Rendimiento aceptable con margen de mejora."
+                    color = "info"
+                
+                # Mostrar análisis del cluster
+                with st.expander(f"**Cluster {i}** - {count} estudiantes ({count/len(df_cluster)*100:.1f}%)"):
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.metric("👥 Cantidad", count)
+                        st.metric("📊 Asistencia Promedio", f"{avg_asistencia:.1f}%")
+                        st.metric("📝 Nota Promedio", f"{avg_nota:.2f}")
+                    
+                    with col2:
+                        if color == "success":
+                            st.success(f"""
+                            {perfil}
+                            
+                            {descripcion}
+                            
+                            **Características:**
+                            - Asistencia: {avg_asistencia:.1f}%
+                            - Nota: {avg_nota:.2f}
+                            """)
+                        elif color == "error":
+                            st.error(f"""
+                            {perfil}
+                            
+                            {descripcion}
+                            
+                            **Características:**
+                            - Asistencia: {avg_asistencia:.1f}%
+                            - Nota: {avg_nota:.2f}
+                            """)
+                        elif color == "warning":
+                            st.warning(f"""
+                            {perfil}
+                            
+                            {descripcion}
+                            
+                            **Características:**
+                            - Asistencia: {avg_asistencia:.1f}%
+                            - Nota: {avg_nota:.2f}
+                            """)
+                        else:
+                            st.info(f"""
+                            {perfil}
+                            
+                            {descripcion}
+                            
+                            **Características:**
+                            - Asistencia: {avg_asistencia:.1f}%
+                            - Nota: {avg_nota:.2f}
+                            """)
+            
+            # Conclusiones
+            st.markdown("---")
+            st.subheader("📝 Conclusiones del Clustering")
+            st.write("""
+            **Tipo de Modelo:** Aprendizaje No Supervisado (Clustering)
+            
+            **Algoritmo:** K-Means
+            
+            **Objetivo:** Agrupar estudiantes con patrones similares de rendimiento
+            
+            **Hallazgos clave:**
+            - Se identificaron {} grupos distintos de estudiantes
+            - Los clusters revelan patrones claros de rendimiento académico
+            - La asistencia es un factor diferenciador importante entre grupos
+            - Permite personalizar estrategias de apoyo por perfil de estudiante
+            """.format(n_clusters))
